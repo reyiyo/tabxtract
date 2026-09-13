@@ -46,6 +46,7 @@ import shutil
 import stat
 import sys
 import tarfile
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -107,11 +108,32 @@ TESSDATA_SHA256 = "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a5213255642717
 
 BINARY_NAMES = ("ffmpeg", "ffprobe")
 
+# Some of the hosts above answer the default urllib User-Agent
+# ("Python-urllib/3.x") with 403 Forbidden; ffmpeg.martin-riedl.de does, which
+# is what broke the macOS jobs of the v0.1.0 release. Nothing depends on this
+# particular value: it only has to look like a browser. Every download is
+# still verified against its pinned digest below, so the header buys access,
+# not trust.
+USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
+
 
 def _download(url: str, sha256: str) -> bytes:
     print(f"  downloading {url}")
-    with urllib.request.urlopen(url, timeout=300) as resp:
-        blob = resp.read()
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=300) as resp:
+            blob = resp.read()
+    except urllib.error.HTTPError as exc:
+        # A traceback here says nothing about which of the two failure modes
+        # this is, and they need different fixes.
+        hint = ("the pinned build was probably pruned from the host, so the pin has to "
+                "be bumped" if exc.code == 404 else
+                "the host refused this request; it may be filtering by User-Agent or "
+                "by IP range")
+        raise SystemExit(f"error: HTTP {exc.code} {exc.reason} for {url}\n  {hint}") from exc
+    except urllib.error.URLError as exc:
+        raise SystemExit(f"error: could not reach {url}\n  {exc.reason}") from exc
     actual = hashlib.sha256(blob).hexdigest()
     if actual != sha256:
         raise SystemExit(
