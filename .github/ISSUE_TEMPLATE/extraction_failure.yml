@@ -1,0 +1,72 @@
+name: Extraction failure
+description: TabXtract produced a wrong, incomplete or mangled PDF
+title: "[extraction] "
+labels: ["extraction-failure", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This is the most valuable kind of issue you can open.** The pipeline was built
+        against a small set of real videos, and every layout that breaks it teaches us
+        something.
+
+        You do not need to debug anything. Just tell us what you saw.
+  - type: textarea
+    id: what-went-wrong
+    attributes:
+      label: What went wrong with the output?
+      description: Missing pages, repeated bars, cut staves, garbled notation, wrong region…
+      placeholder: The PDF is missing the whole bridge, and bar 47 appears twice.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Verification report
+      description: On the results screen click **Copy report**, then paste it here. This is usually the fastest route to a diagnosis.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: advance-mode
+    attributes:
+      label: Detected advance mode
+      description: Shown on the review screen.
+      options:
+        - Vertical scroll
+        - Horizontal scroll
+        - Paged
+        - Detection failed / not shown
+    validations:
+      required: true
+  - type: textarea
+    id: layout
+    attributes:
+      label: Describe the video layout
+      description: Where is the tab on screen? Is there performance footage? What colour is the playback cursor? Multiple songs?
+      placeholder: Tab in a horizontal strip across the top third, webcam footage below, green cursor, five songs back to back.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Video source
+      description: A link if it's public, otherwise the channel or the kind of source. Please do not attach copyrighted video files.
+  - type: input
+    id: resolution
+    attributes:
+      label: Video resolution and frame rate
+      placeholder: 1920x1080, 30fps
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: A frame from the video plus the wrong page of the PDF is ideal. Drag images in here.
+  - type: input
+    id: version
+    attributes:
+      label: TabXtract version and operating system
+      description: The version is shown in **Preferences → About**.
+      placeholder: 0.1.0, macOS 15.2 (Apple Silicon)
+    validations:
+      required: true

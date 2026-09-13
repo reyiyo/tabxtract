@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Main window permissions: choose files, open the generated PDF and reveal it in the file manager, open the project's GitHub pages in the browser, and check for updates.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "dialog:allow-open",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "**/*.pdf" }]
+    },
+    "opener:allow-reveal-item-in-dir",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/reyiyo/tabxtract/*" }]
+    },
+    "updater:default"
+  ]
+}

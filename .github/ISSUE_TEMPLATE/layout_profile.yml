@@ -1,0 +1,30 @@
+name: Layout profile contribution
+description: Share a working profile for a source we don't cover yet
+title: "[profile] "
+labels: ["layout-profile"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Profiles make TabXtract work out of the box for a given source. Sharing one you
+        had to build by hand saves the next person the same work.
+  - type: input
+    id: source-name
+    attributes:
+      label: Source name
+      placeholder: Songsterr, Guitar Pro 8 screen capture, a specific YouTube channel…
+    validations:
+      required: true
+  - type: textarea
+    id: profile-json
+    attributes:
+      label: Exported profile JSON
+      description: Settings → Profiles → Export.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: What did auto-detection get wrong?
+      description: Helps us improve detection so the profile eventually becomes unnecessary.

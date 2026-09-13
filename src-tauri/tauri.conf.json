@@ -1,0 +1,68 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TabXtract",
+  "version": "0.1.0",
+  "identifier": "app.tabxtract",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "TabXtract",
+        "width": 1200,
+        "height": 840,
+        "minWidth": 900,
+        "minHeight": 620
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: http://127.0.0.1:*; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:*"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "dmg",
+      "nsis",
+      "appimage",
+      "deb"
+    ],
+    "category": "Music",
+    "shortDescription": "Tablature from video to PDF",
+    "longDescription": "Reads the notation off a tablature video and rebuilds it as a printable A4 PDF. It runs entirely on the user's machine.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "sidecar/**/*",
+      "native/**/*"
+    ],
+    "createUpdaterArtifacts": true,
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "ffmpeg",
+          "tesseract-ocr"
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/reyiyo/tabxtract/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ5QzY1OTk2RDcxMDFBNkEKUldScUdoRFhsbG5HU1NXeGdrcHkxaFQwRStBRWZpVzNRb2lkdVF3dURPekl3QzhVRFpUOXBPby8K%"
+    }
+  }
+}

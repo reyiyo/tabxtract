@@ -1,0 +1,3 @@
+# Placeholder. The real contents are produced by the build scripts;
+# this file exists so the `resources` glob in tauri.conf.json matches
+# something even in a freshly cloned tree.

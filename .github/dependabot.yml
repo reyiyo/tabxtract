@@ -1,0 +1,26 @@
+# Keeps the pinned versions from going stale: the action SHAs, the npm and
+# Cargo lockfiles and the hashed Python lock in requirements/sidecar.txt all
+# stop receiving security fixes the moment nobody bumps them.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      tauri: { patterns: ["@tauri-apps/*"] }
+
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule: { interval: weekly }
+    groups:
+      tauri: { patterns: ["tauri*"] }
+
+  - package-ecosystem: pip
+    directory: /requirements
+    schedule: { interval: weekly }

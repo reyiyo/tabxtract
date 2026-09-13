@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TabXtract</title>
+<meta name="description" content="Free desktop app that turns a tablature video into a printable PDF. Runs on your computer, nothing is uploaded.">
+<meta property="og:title" content="TabXtract">
+<meta property="og:description" content="Turn a tablature video into a printable PDF. Free, open source, runs on your computer.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🎸</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+  :root{
+    --paper:#f6f7f4; --paper-2:#eceee8; --ink:#17201d; --ink-2:#4b5651; --line:#cfd5cf;
+    --accent:#d9562a; --accent-ink:#fff7f3; --green:#2c7a5e;
+    --radius:10px; --measure:64ch;
+    color-scheme:light dark;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#131917; --paper-2:#1b2320; --ink:#eef1ed; --ink-2:#a3aea8; --line:#2c3632;
+      --accent:#f0743f; --accent-ink:#1a0d06; --green:#5cc39b;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#131917; --paper-2:#1b2320; --ink:#eef1ed; --ink-2:#a3aea8; --line:#2c3632;
+    --accent:#f0743f; --accent-ink:#1a0d06; --green:#5cc39b;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font:17px/1.6 "IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-block:0 64px;
+  }
+  a{color:var(--accent)}
+  a:focus-visible,button:focus-visible{outline:3px solid var(--accent); outline-offset:3px}
+  code,kbd,pre{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.92em}
+  .wrap{max-width:860px; margin:0 auto; padding:0 20px}
+  h1,h2,h3{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif; letter-spacing:-.02em; text-wrap:balance; margin:0}
+  h1{font-size:clamp(38px,6vw,64px); line-height:1.02; font-weight:700; font-variation-settings:"opsz" 96}
+  h2{font-size:clamp(26px,3.6vw,34px); line-height:1.15; font-weight:700}
+  h3{font-size:19px; font-weight:700; margin-bottom:6px}
+  p{max-width:var(--measure); margin:0}
+  .muted{color:var(--ink-2)}
+
+  /* language toggle: only the active language is rendered */
+  [data-lang="en"] .es, [data-lang="es"] .en{display:none}
+
+  header{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 0}
+  .brand{font-family:"Bricolage Grotesque",sans-serif; font-weight:700; font-size:20px; color:var(--ink); text-decoration:none}
+  .brand span{color:var(--accent)}
+  .lang{display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden}
+  .lang button{
+    font:inherit; font-size:13px; font-weight:600; letter-spacing:.04em; padding:6px 12px;
+    background:transparent; color:var(--ink-2); border:0; cursor:pointer;
+  }
+  .lang button[aria-pressed="true"]{background:var(--ink); color:var(--paper)}
+
+  .hero{padding:40px 0 20px; display:grid; gap:28px; grid-template-columns:1.2fr .8fr; align-items:center}
+  .hero .tagline{font-size:clamp(18px,2.2vw,21px); margin-top:18px}
+  .staff{width:100%; max-width:100%; height:auto; display:block}
+  .staff line{stroke:var(--ink-2); stroke-width:1.5}
+  .staff text{font-family:"IBM Plex Mono",monospace; font-size:22px; font-weight:400; fill:var(--ink)}
+  .staff .tune{fill:var(--ink-2); font-size:16px}
+  .staff .cursor{fill:var(--accent); opacity:.85}
+  @media (max-width:640px){ .hero{grid-template-columns:1fr} }
+
+  .dl{margin-top:28px; display:flex; flex-direction:column; gap:10px; align-items:flex-start}
+  .btn{
+    display:inline-flex; align-items:center; gap:10px; background:var(--accent); color:var(--accent-ink);
+    font-family:"Bricolage Grotesque",sans-serif; font-weight:700; font-size:19px; padding:15px 26px;
+    border-radius:var(--radius); text-decoration:none; transition:transform .12s ease, filter .12s ease;
+  }
+  .btn:hover{filter:brightness(1.06); transform:translateY(-1px)}
+  .meta{font-size:14px; color:var(--ink-2); min-height:21px; font-variant-numeric:tabular-nums}
+  .others{display:flex; flex-wrap:wrap; gap:8px}
+  .others a{font-size:14px; color:var(--ink-2); text-decoration:none; border:1px solid var(--line); border-radius:999px; padding:5px 12px; background:var(--paper-2)}
+  .others a:hover{color:var(--ink); border-color:var(--ink-2)}
+  .free{display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--green); font-weight:600}
+  .free::before{content:""; width:8px; height:8px; border-radius:50%; background:var(--green)}
+
+  section{padding:48px 0 0}
+  section > .wrap > h2{margin-bottom:8px}
+  .lede{margin-bottom:24px}
+
+  ol.steps{list-style:none; padding:0; margin:0; display:grid; gap:12px; counter-reset:s}
+  ol.steps li{counter-increment:s; display:grid; grid-template-columns:44px 1fr; gap:14px; align-items:start; padding:16px 0; border-top:1px solid var(--line)}
+  ol.steps li::before{
+    content:counter(s); font-family:"Bricolage Grotesque",sans-serif; font-weight:700; font-size:30px; line-height:1;
+    color:var(--accent); font-variant-numeric:tabular-nums;
+  }
+  ol.steps b{display:block; font-weight:600; margin-bottom:2px}
+  ol.steps span{color:var(--ink-2)}
+
+  .os-tabs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px}
+  .os-tabs button{
+    font:inherit; font-size:15px; font-weight:600; padding:8px 16px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:transparent; color:var(--ink-2);
+  }
+  .os-tabs button[aria-selected="true"]{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+  .os-panel{display:none}
+  .os-panel[data-active]{display:block}
+  .os-panel ol{padding-left:22px; margin:0 0 14px; max-width:var(--measure)}
+  .os-panel li{margin-bottom:8px}
+  .os-panel li::marker{color:var(--accent); font-weight:600}
+  details{border:1px solid var(--line); border-radius:var(--radius); padding:12px 16px; max-width:var(--measure); background:var(--paper-2)}
+  summary{cursor:pointer; font-weight:600}
+  details p{margin-top:10px}
+  pre{background:var(--ink); color:var(--paper); border-radius:8px; padding:12px 14px; overflow-x:auto; margin:10px 0 0; max-width:var(--measure)}
+  [data-theme="dark"] pre, .dark-pre{background:var(--paper-2); color:var(--ink)}
+
+  .why{border-left:3px solid var(--accent); padding:4px 0 4px 16px; max-width:var(--measure); margin-bottom:22px}
+
+  .two{display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .card{border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px; display:flex; flex-direction:column; gap:10px}
+  .card p{flex:1}
+  .card a.small{align-self:flex-start; font-weight:600; text-decoration:none; border-bottom:2px solid var(--accent); padding-bottom:1px; color:var(--ink)}
+
+  ul.plain{list-style:none; padding:0; margin:0 0 14px; max-width:var(--measure); display:grid; gap:8px}
+  ul.plain li{padding-left:18px; position:relative; color:var(--ink-2)}
+  ul.plain li::before{content:"–"; position:absolute; left:0; color:var(--accent)}
+  ul.plain b{color:var(--ink); font-weight:600}
+
+  footer{margin-top:56px; border-top:1px solid var(--line); padding-top:24px; font-size:14px; color:var(--ink-2)}
+  footer .row{display:flex; flex-wrap:wrap; gap:8px 22px; margin-bottom:14px}
+  footer a{color:var(--ink-2)}
+  footer p{font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <a class="brand" href="#top">Tab<span>Xtract</span></a>
+  <div class="lang" role="group" aria-label="Language / Idioma">
+    <button type="button" id="lang-en" data-set-lang="en" aria-pressed="true">EN</button>
+    <button type="button" id="lang-es" data-set-lang="es" aria-pressed="false">ES</button>
+  </div>
+</header>
+
+<div class="hero" id="top">
+  <div>
+    <h1 class="en">Print the tab that only exists as a video.</h1>
+    <h1 class="es">Imprimí la tablatura que sólo existe como video.</h1>
+    <p class="tagline muted en">Some tabs are only published on YouTube, scrolling by while someone plays. TabXtract reads the notation off the video and turns it into a PDF you can print and put on the music stand.</p>
+    <p class="tagline muted es">Hay tablaturas que sólo están en YouTube, pasando mientras alguien toca. TabXtract lee la notación del video y la convierte en un PDF para imprimir y poner en el atril.</p>
+
+    <div class="dl">
+      <a class="btn" id="dl-primary" href="https://github.com/reyiyo/tabxtract/releases/latest">
+        <span id="dl-label"><span class="en">Loading downloads…</span><span class="es">Buscando descargas…</span></span>
+      </a>
+      <div class="meta" id="dl-meta"></div>
+      <div class="others" id="dl-others"></div>
+      <span class="free"><span class="en">Free, open source, works offline</span><span class="es">Gratis, código abierto, funciona sin internet</span></span>
+    </div>
+  </div>
+
+  <svg class="staff" viewBox="0 0 360 200" role="img" aria-label="A guitar tablature staff with a playback cursor">
+    <g class="tune">
+      <text x="0" y="46">e</text><text x="0" y="74">B</text><text x="0" y="102">G</text>
+      <text x="0" y="130">D</text><text x="0" y="158">A</text><text x="0" y="186">E</text>
+    </g>
+    <g>
+      <line x1="24" y1="40" x2="360" y2="40"/><line x1="24" y1="68" x2="360" y2="68"/>
+      <line x1="24" y1="96" x2="360" y2="96"/><line x1="24" y1="124" x2="360" y2="124"/>
+      <line x1="24" y1="152" x2="360" y2="152"/><line x1="24" y1="180" x2="360" y2="180"/>
+    </g>
+    <rect class="cursor" x="128" y="20" width="6" height="176" rx="3"/>
+    <g>
+      <text x="44" y="104">5</text><text x="72" y="104">7</text><text x="100" y="76">5</text>
+      <text x="140" y="76">7</text><text x="168" y="48">8</text><text x="196" y="132">7</text>
+      <text x="224" y="132">5</text><text x="252" y="160">7</text><text x="280" y="160">5</text>
+      <text x="308" y="188">3</text><text x="336" y="188">0</text>
+    </g>
+  </svg>
+</div>
+
+<section id="how">
+  <h2 class="en">How it works</h2>
+  <h2 class="es">Cómo funciona</h2>
+  <p class="lede muted en">Three steps. The app does the reading; you just check the result.</p>
+  <p class="lede muted es">Tres pasos. La app hace la lectura; vos sólo revisás el resultado.</p>
+  <ol class="steps">
+    <li><div>
+      <b class="en">Choose the video</b><b class="es">Elegí el video</b>
+      <span class="en">Paste a YouTube link, or open a video file you already have. Nothing is uploaded anywhere.</span>
+      <span class="es">Pegá un link de YouTube, o abrí un archivo de video que ya tengas. No se sube nada a ningún lado.</span>
+    </div></li>
+    <li><div>
+      <b class="en">Check the frame</b><b class="es">Revisá el recuadro</b>
+      <span class="en">TabXtract shows you the area of the screen it found the tab in. If it's off, drag the rectangle. Videos with several songs are split for you.</span>
+      <span class="es">TabXtract te muestra en qué parte de la pantalla encontró la tablatura. Si no coincide, arrastrás el rectángulo. Los videos con varias canciones se separan solos.</span>
+    </div></li>
+    <li><div>
+      <b class="en">Print the PDF</b><b class="es">Imprimí el PDF</b>
+      <span class="en">One A4 PDF per song, with the moving cursor removed. A short report tells you if any bars might be missing, so you can check before printing.</span>
+      <span class="es">Un PDF A4 por canción, sin el cursor que se mueve. Un informe corto te avisa si puede faltar algún compás, para que lo revises antes de imprimir.</span>
+    </div></li>
+  </ol>
+</section>
+
+<section id="install">
+  <h2 class="en">Opening it the first time</h2>
+  <h2 class="es">Abrirla por primera vez</h2>
+  <div class="why muted">
+    <p class="en">Your computer will warn you the first time, because TabXtract isn't "signed". Signing costs a few hundred dollars a year and this is a free project, so we skip it. The app is built in public from the source code you can read on GitHub. Here's how to get past the warning once; after that it opens like any other app.</p>
+    <p class="es">La primera vez tu computadora te va a avisar, porque TabXtract no está "firmada". Firmar cuesta unos cientos de dólares por año y este es un proyecto gratuito, así que no lo hacemos. La app se compila públicamente a partir del código que podés leer en GitHub. Así se pasa el aviso una sola vez; después abre como cualquier otra.</p>
+  </div>
+
+  <div class="os-tabs" role="tablist">
+    <button type="button" role="tab" id="tab-mac" data-os="mac" aria-selected="true">macOS</button>
+    <button type="button" role="tab" id="tab-windows" data-os="windows" aria-selected="false">Windows</button>
+    <button type="button" role="tab" id="tab-linux" data-os="linux" aria-selected="false">Linux</button>
+  </div>
+
+  <div class="os-panel" data-os="mac" data-active>
+    <ol class="en">
+      <li>Open the downloaded <code>.dmg</code> and drag TabXtract into <b>Applications</b>.</li>
+      <li>Double-click it. macOS will say it can't be opened. Close that message.</li>
+      <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down to the line about TabXtract and click <b>Open Anyway</b>. Type your password if asked.</li>
+      <li>Done. From now on it opens normally.</li>
+    </ol>
+    <ol class="es">
+      <li>Abrí el <code>.dmg</code> descargado y arrastrá TabXtract a <b>Aplicaciones</b>.</li>
+      <li>Hacé doble clic. macOS te va a decir que no se puede abrir. Cerrá ese mensaje.</li>
+      <li>Abrí <b>Ajustes del Sistema → Privacidad y seguridad</b>, bajá hasta la línea sobre TabXtract y tocá <b>Abrir de todos modos</b>. Poné tu contraseña si te la pide.</li>
+      <li>Listo. De ahí en adelante abre normal.</li>
+    </ol>
+    <details>
+      <summary class="en">It says the app is "damaged"</summary>
+      <summary class="es">Dice que la app está "dañada"</summary>
+      <p class="en">That's the same block wearing a different message. Open the <b>Terminal</b> app (search for it with Spotlight), paste this line, press Enter, and try opening TabXtract again:</p>
+      <p class="es">Es el mismo bloqueo con otro mensaje. Abrí la app <b>Terminal</b> (buscala con Spotlight), pegá esta línea, apretá Enter y volvé a abrir TabXtract:</p>
+      <pre><code>xattr -dr com.apple.quarantine /Applications/TabXtract.app</code></pre>
+    </details>
+    <p class="muted en" style="margin-top:14px">Not sure if your Mac is Intel or Apple Silicon? Click the Apple menu → <b>About This Mac</b>. If it says "Chip: Apple M…", pick the Apple Silicon download.</p>
+    <p class="muted es" style="margin-top:14px">¿No sabés si tu Mac es Intel o Apple Silicon? Menú Apple → <b>Acerca de esta Mac</b>. Si dice "Chip: Apple M…", elegí la descarga para Apple Silicon.</p>
+  </div>
+
+  <div class="os-panel" data-os="windows">
+    <ol class="en">
+      <li>Your browser may warn about the download. Choose <b>Keep</b>.</li>
+      <li>Open the installer. A blue box says "Windows protected your PC".</li>
+      <li>Click <b>More info</b>, then <b>Run anyway</b>.</li>
+      <li>Done. The installer takes it from there.</li>
+    </ol>
+    <ol class="es">
+      <li>El navegador puede avisarte sobre la descarga. Elegí <b>Conservar</b>.</li>
+      <li>Abrí el instalador. Aparece un cuadro azul: "Windows protegió su PC".</li>
+      <li>Tocá <b>Más información</b> y después <b>Ejecutar de todas formas</b>.</li>
+      <li>Listo. El instalador sigue solo.</li>
+    </ol>
+  </div>
+
+  <div class="os-panel" data-os="linux">
+    <p class="en" style="margin-bottom:10px">No warning on Linux. The <code>.deb</code> installs with a double-click on Debian and Ubuntu. The AppImage needs to be marked as executable first, either by right-click → Properties → "Allow executing as program", or in a terminal:</p>
+    <p class="es" style="margin-bottom:10px">En Linux no hay aviso. El <code>.deb</code> se instala con doble clic en Debian y Ubuntu. El AppImage primero hay que marcarlo como ejecutable, con clic derecho → Propiedades → "Permitir ejecutar como programa", o en una terminal:</p>
+    <pre><code>chmod +x TabXtract-*.AppImage
+./TabXtract-*.AppImage</code></pre>
+  </div>
+</section>
+
+<section id="update">
+  <h2 class="en">Updating</h2>
+  <h2 class="es">Actualizar</h2>
+  <p class="en">TabXtract checks for a new version when it starts and asks you before installing it. You can turn that off in <b>Preferences</b>. To update by hand, download the new version from the button above and install it over the old one. Your history and settings are kept.</p>
+  <p class="es">TabXtract busca una versión nueva al arrancar y te pregunta antes de instalarla. Podés desactivarlo en <b>Preferences</b>. Para actualizar a mano, bajá la versión nueva con el botón de arriba e instalala encima de la anterior. Tu historial y tu configuración se conservan.</p>
+</section>
+
+<section id="help">
+  <h2 class="en">Something went wrong?</h2>
+  <h2 class="es">¿Algo salió mal?</h2>
+  <p class="lede muted en">You don't need to know anything technical. Pick the form that matches, and it will ask you for exactly what helps.</p>
+  <p class="lede muted es">No hace falta que sepas nada técnico. Elegí el formulario que corresponda y te va pidiendo justo lo que sirve.</p>
+  <div class="two">
+    <div class="card">
+      <h3 class="en">The PDF came out wrong</h3>
+      <h3 class="es">El PDF salió mal</h3>
+      <p class="muted en">Missing pages, repeated bars, a staff cut in half, or the wrong part of the video. On the results screen click <b>Copy report</b> and paste it into the form.</p>
+      <p class="muted es">Faltan páginas, se repiten compases, un pentagrama cortado o agarró otra parte del video. En la pantalla de resultados tocá <b>Copy report</b> y pegalo en el formulario.</p>
+      <a class="small" href="https://github.com/reyiyo/tabxtract/issues/new?template=extraction_failure.yml"><span class="en">Report a bad PDF →</span><span class="es">Reportar un PDF malo →</span></a>
+    </div>
+    <div class="card">
+      <h3 class="en">The app crashed or a download failed</h3>
+      <h3 class="es">La app se rompió o falló una descarga</h3>
+      <p class="muted en">In the app, open <b>Preferences → Open data folder</b> and attach the file <code>tabxtract.log</code>. If a YouTube download fails, try <b>Update yt-dlp</b> in Preferences first: YouTube changes often.</p>
+      <p class="muted es">En la app, abrí <b>Preferences → Open data folder</b> y adjuntá el archivo <code>tabxtract.log</code>. Si falla una descarga de YouTube, probá primero <b>Update yt-dlp</b> en Preferences: YouTube cambia seguido.</p>
+      <a class="small" href="https://github.com/reyiyo/tabxtract/issues/new?template=bug_report.yml"><span class="en">Report a problem →</span><span class="es">Reportar un problema →</span></a>
+    </div>
+  </div>
+  <p class="muted en" style="margin-top:16px">You'll need a free GitHub account to send the form. Please don't attach the video itself unless it's yours; a link is enough.</p>
+  <p class="muted es" style="margin-top:16px">Para mandar el formulario necesitás una cuenta gratuita de GitHub. No adjuntes el video salvo que sea tuyo; con el link alcanza.</p>
+</section>
+
+<section id="limits">
+  <h2 class="en">Good to know</h2>
+  <h2 class="es">Bueno saberlo</h2>
+  <ul class="plain">
+    <li><b class="en">It copies what's in the video.</b><b class="es">Copia lo que hay en el video.</b> <span class="en">The PDF is an image of the notation, not a new transcription, so it can't be "wrong" in a different way than the source. It also can't be edited as notes or exported to Guitar Pro.</span><span class="es">El PDF es una imagen de la notación, no una transcripción nueva, así que no puede estar "mal" de otra forma que el original. Tampoco se puede editar nota por nota ni exportar a Guitar Pro.</span></li>
+    <li><b class="en">Video quality sets the limit.</b><b class="es">La calidad del video pone el límite.</b> <span class="en">A 1080p video prints well. A 360p one won't, no matter what.</span><span class="es">Un video en 1080p imprime bien. Uno en 360p no, hagas lo que hagas.</span></li>
+    <li><b class="en">Any instrument.</b><b class="es">Cualquier instrumento.</b> <span class="en">Guitar, bass, ukulele, drums: the app doesn't care what the lines mean.</span><span class="es">Guitarra, bajo, ukelele, batería: a la app no le importa qué significan las líneas.</span></li>
+    <li><b class="en">Personal use.</b><b class="es">Uso personal.</b> <span class="en">Tabs are often copyrighted and some are sold. Use it on material you have the right to use.</span><span class="es">Las tablaturas suelen tener derechos de autor y algunas se venden. Usala con material que tengas derecho a usar.</span></li>
+  </ul>
+</section>
+
+<section id="dev">
+  <h2 class="en">For developers</h2>
+  <h2 class="es">Para desarrolladores</h2>
+  <p class="muted en">TabXtract is GPL-3.0. The computer-vision engine is a standalone Python package with a CLI, the desktop app wraps it with Tauri, and every installer is built by public CI from a tagged commit. <a href="https://github.com/reyiyo/tabxtract#readme">README</a> · <a href="https://github.com/reyiyo/tabxtract/blob/main/ARCHITECTURE.md">Architecture</a> · <a href="https://github.com/reyiyo/tabxtract/blob/main/CONTRIBUTING.md">Contributing</a></p>
+  <p class="muted es">TabXtract es GPL-3.0. El motor de visión por computadora es un paquete Python independiente con CLI, la app de escritorio lo envuelve con Tauri, y cada instalador lo compila la CI pública a partir de un commit etiquetado. <a href="https://github.com/reyiyo/tabxtract#readme">README</a> · <a href="https://github.com/reyiyo/tabxtract/blob/main/ARCHITECTURE.md">Arquitectura</a> · <a href="https://github.com/reyiyo/tabxtract/blob/main/CONTRIBUTING.md">Contribuir</a> (en inglés)</p>
+</section>
+
+<footer>
+  <div class="row">
+    <a href="https://github.com/reyiyo/tabxtract"><span class="en">Source code</span><span class="es">Código fuente</span></a>
+    <a href="https://github.com/reyiyo/tabxtract/releases"><span class="en">All versions</span><span class="es">Todas las versiones</span></a>
+    <span>GPL-3.0</span>
+  </div>
+  <p class="en">TabXtract is intended for personal use on material you have the right to use. Downloading from video platforms may conflict with their terms of service depending on jurisdiction and circumstances. You are responsible for what you process with it. It has no sharing features: nothing you extract leaves your computer.</p>
+  <p class="es">TabXtract está pensada para uso personal con material que tengas derecho a usar. Descargar de plataformas de video puede ir contra sus términos de servicio según la jurisdicción y las circunstancias. Sos responsable de lo que procesás con ella. No tiene funciones para compartir: nada de lo que extraés sale de tu computadora.</p>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var OWNER = "reyiyo", REPO = "tabxtract";
+  var base = "https://github.com/" + OWNER + "/" + REPO;
+  var relPage = base + "/releases/latest";
+  var root = document.documentElement;
+
+  // ---- language ------------------------------------------------------------
+  var T = {
+    en: { loading:"Loading downloads…", dl:"Download for ", view:"See all downloads", pick:"pick your system below",
+          noassets:"No installers attached yet.", api:"Couldn't reach GitHub; every build is on the downloads page.",
+          intel:"Intel Mac? Use the macOS (Intel) download below.", how:"First time opening it? See the steps below." },
+    es: { loading:"Buscando descargas…", dl:"Descargar para ", view:"Ver todas las descargas", pick:"elegí tu sistema abajo",
+          noassets:"Todavía no hay instaladores publicados.", api:"No se pudo consultar GitHub; todas las versiones están en la página de descargas.",
+          intel:"¿Mac Intel? Usá la descarga macOS (Intel) de abajo.", how:"¿Primera vez que la abrís? Mirá los pasos más abajo." }
+  };
+  var NAMES = {
+    en: { mac:"macOS (Apple Silicon)", macintel:"macOS (Intel)", windows:"Windows", linux:"Linux (AppImage)", debian:"Linux (.deb)" },
+    es: { mac:"macOS (Apple Silicon)", macintel:"macOS (Intel)", windows:"Windows", linux:"Linux (AppImage)", debian:"Linux (.deb)" }
+  };
+  function lang() { return root.getAttribute("data-lang") || "en"; }
+  function setLang(l, persist) {
+    root.setAttribute("data-lang", l);
+    root.setAttribute("lang", l);
+    document.querySelectorAll("[data-set-lang]").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-set-lang") === l ? "true" : "false");
+    });
+    if (persist) { try { localStorage.setItem("tabxtract-lang", l); } catch (e) {} }
+    renderDownloads();
+  }
+  var saved = null;
+  try { saved = localStorage.getItem("tabxtract-lang"); } catch (e) {}
+  var initial = saved || ((navigator.language || "").toLowerCase().indexOf("es") === 0 ? "es" : "en");
+  document.querySelectorAll("[data-set-lang]").forEach(function (b) {
+    b.addEventListener("click", function () { setLang(b.getAttribute("data-set-lang"), true); });
+  });
+
+  // ---- OS tabs -------------------------------------------------------------
+  function detect() {
+    var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+    var s = (p + " " + navigator.userAgent).toLowerCase();
+    if (/mac|iphone|ipad/.test(s)) return "mac";
+    if (/win/.test(s)) return "windows";
+    if (/android/.test(s)) return null;
+    if (/linux|x11|ubuntu/.test(s)) return "linux";
+    return null;
+  }
+  function showOs(os) {
+    document.querySelectorAll(".os-tabs [data-os]").forEach(function (b) {
+      b.setAttribute("aria-selected", b.getAttribute("data-os") === os ? "true" : "false");
+    });
+    document.querySelectorAll(".os-panel").forEach(function (p) {
+      if (p.getAttribute("data-os") === os) p.setAttribute("data-active", ""); else p.removeAttribute("data-active");
+    });
+  }
+  document.querySelectorAll(".os-tabs [data-os]").forEach(function (b) {
+    b.addEventListener("click", function () { showOs(b.getAttribute("data-os")); });
+  });
+  var mine = detect();
+  showOs(mine || "mac");
+
+  // ---- downloads -----------------------------------------------------------
+  // Two macOS builds, one per architecture: the Python engine is a frozen
+  // bundle and cannot be made universal.
+  var PLATFORMS = [
+    { key:"mac",      match:/(aarch64|arm64).*\.dmg$/i },
+    { key:"macintel", match:/(x64|x86_64|intel).*\.dmg$/i },
+    { key:"windows",  match:/\.(msi|exe)$/i },
+    { key:"linux",    match:/\.AppImage$/i },
+    { key:"debian",   match:/\.deb$/i }
+  ];
+  var release = null, apiFailed = false;
+  var label = document.getElementById("dl-label"), btn = document.getElementById("dl-primary"),
+      meta = document.getElementById("dl-meta"), others = document.getElementById("dl-others");
+
+  function fallback(msg) {
+    btn.href = relPage;
+    label.textContent = T[lang()].view;
+    meta.textContent = msg || "";
+    others.innerHTML = "";
+  }
+  function renderDownloads() {
+    var t = T[lang()], names = NAMES[lang()];
+    if (apiFailed) return fallback(t.api);
+    if (!release) { label.textContent = t.loading; return; }
+    var assets = release.assets || [];
+    if (!assets.length) return fallback(t.noassets);
+
+    var found = {};
+    PLATFORMS.forEach(function (pf) {
+      var a = assets.find(function (x) { return pf.match.test(x.name); });
+      if (a) found[pf.key] = a;
+    });
+    var primary = (mine && found[mine]) ? mine
+                : found.mac ? "mac" : found.macintel ? "macintel"
+                : found.windows ? "windows" : found.linux ? "linux" : "debian";
+    var pa = found[primary];
+    if (!pa) return fallback();
+
+    btn.href = pa.browser_download_url;
+    label.textContent = t.dl + names[primary];
+    var mb = (pa.size / 1048576).toFixed(0) + " MB";
+    var date = release.published_at
+      ? new Date(release.published_at).toLocaleDateString(lang() === "es" ? "es-AR" : "en-GB", { year:"numeric", month:"short", day:"numeric" })
+      : "";
+    var bits = [release.tag_name, mb, date].filter(Boolean);
+    if (!mine) bits.push(t.pick);
+    if (primary === "mac") bits.push(t.intel);
+    meta.textContent = bits.join(" · ");
+
+    others.innerHTML = "";
+    PLATFORMS.forEach(function (pf) {
+      if (pf.key === primary || !found[pf.key]) return;
+      var a = document.createElement("a");
+      a.href = found[pf.key].browser_download_url;
+      a.textContent = names[pf.key];
+      others.appendChild(a);
+    });
+    var how = document.createElement("a");
+    how.href = "#install";
+    how.textContent = t.how;
+    others.appendChild(how);
+  }
+
+  setLang(initial, false);
+
+  fetch("https://api.github.com/repos/" + OWNER + "/" + REPO + "/releases/latest",
+        { headers: { Accept: "application/vnd.github+json" } })
+    .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+    .then(function (rel) { release = rel; renderDownloads(); })
+    .catch(function () { apiFailed = true; renderDownloads(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+name: Bug report
+description: Something broke that isn't about extraction quality
+title: "[bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        You don't need to know anything technical: just describe what you saw.
+
+        If the app ran but the **PDF came out wrong**, please use the
+        *Extraction failure* template instead — it asks for the right details.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the app
+        2. Paste a URL
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log file
+      description: |
+        In the app, open **Preferences → Open data folder** and drag the file `tabxtract.log`
+        into this box (or paste its last lines). Please remove anything personal first,
+        such as file names you'd rather not share.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: TabXtract version and operating system
+      description: The version is shown in **Preferences → About**.
+      placeholder: 0.1.0, Windows 11
+    validations:
+      required: true
+  - type: checkboxes
+    id: interface
+    attributes:
+      label: Where did it happen?
+      options:
+        - label: Desktop app
+        - label: CLI

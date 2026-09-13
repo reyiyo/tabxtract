@@ -1,0 +1,46 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+tsconfig.tsbuildinfo
+
+# Desktop app build artifacts (src-tauri/ has its own .gitignore for target/, gen/, sidecar/, native/)
+build/
+dist-artifacts/
+
+# Local state, logs, secrets and personal notes
+data/
+*.local*
+*.log
+.env
+.env.*
+
+# Videos and reference material never enter the repository. Tests use
+# synthetic frames (tests/synthetic.py).
+*.mp4
+*.mkv
+*.webm
+*.mov
+*.avi
+reference-pdfs/
+test-videos/
+
