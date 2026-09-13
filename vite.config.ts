@@ -15,6 +15,8 @@ export default defineConfig({
     sourcemap: false,
   },
   test: {
-    environment: "node",
+    // Component tests render into a DOM; the pure tests do not mind it.
+    environment: "jsdom",
+    setupFiles: ["src/__tests__/setup.ts"],
   },
 });

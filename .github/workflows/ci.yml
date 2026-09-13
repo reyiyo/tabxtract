@@ -34,16 +34,22 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
 
-      # The engine shells out to ffmpeg, so the tests need it present.
-      - name: ffmpeg (Linux)
+      # The engine shells out to ffmpeg and tesseract. Without tesseract the
+      # bar-number OCR degrades silently (verify.py returns None), so the
+      # measure-continuity check would never run here.
+      - name: System dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: ffmpeg (macOS)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr
+      - name: System dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install ffmpeg
-      - name: ffmpeg (Windows)
+        run: brew install ffmpeg tesseract
+      - name: System dependencies (Windows)
         if: runner.os == 'Windows'
-        run: choco install ffmpeg -y --no-progress
+        run: choco install ffmpeg tesseract -y --no-progress
+      # Fails loudly if tesseract is not on PATH, instead of letting the OCR
+      # degrade in silence.
+      - name: tesseract on PATH
+        run: tesseract --version
 
       - run: pip install -e ".[dev]"
 
