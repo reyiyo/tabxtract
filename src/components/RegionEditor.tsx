@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RegionOverride } from "../types";
 
 interface Props {
@@ -19,7 +19,14 @@ export function RegionEditor({ imageUrl, initialRegion, onChange }: Props) {
   const [region, setRegion] = useState<RegionOverride>(initialRegion);
   const dragRef = useRef<{ mode: DragMode; startX: number; startY: number; start: RegionOverride } | null>(null);
 
-  useEffect(() => setRegion(initialRegion), [initialRegion]);
+  // The prop is mirrored into state during render instead of from an effect:
+  // an effect would commit one render with the previous region still drawn.
+  // This is the documented way to reset state when a prop changes.
+  const [syncedRegion, setSyncedRegion] = useState(initialRegion);
+  if (initialRegion !== syncedRegion) {
+    setSyncedRegion(initialRegion);
+    setRegion(initialRegion);
+  }
 
   useEffect(() => {
     const img = new Image();
@@ -31,11 +38,7 @@ export function RegionEditor({ imageUrl, initialRegion, onChange }: Props) {
     img.src = imageUrl;
   }, [imageUrl]);
 
-  useEffect(() => {
-    draw();
-  }, [region, scale]);
-
-  function draw() {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imgRef.current;
     if (!canvas || !img || !scale) return;
@@ -62,7 +65,13 @@ export function RegionEditor({ imageUrl, initialRegion, onChange }: Props) {
     for (const [hx, hy] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) {
       ctx.fillRect(hx - HANDLE_SIZE / 2, hy - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
     }
-  }
+  }, [region, scale]);
+
+  // Declared after `draw` on purpose: reading it before its declaration is
+  // what the react-hooks immutability rule flags.
+  useEffect(() => {
+    draw();
+  }, [draw]);
 
   function hitTest(px: number, py: number): DragMode {
     const x0 = region.x0 * scale, y0 = region.y0 * scale;

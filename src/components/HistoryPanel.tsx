@@ -32,8 +32,18 @@ export function HistoryPanel({ onOpenJob }: Props) {
     setJobs(await listJobs());
   }
 
+  // The fetch lives inside the effect, and the state lands in the promise
+  // callback rather than in the effect body: setting state synchronously in an
+  // effect costs an extra render pass. `cancelled` covers the panel being
+  // unmounted while the query is still in flight.
   useEffect(() => {
-    void refresh();
+    let cancelled = false;
+    void listJobs().then((rows) => {
+      if (!cancelled) setJobs(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (!jobs.length) return null;

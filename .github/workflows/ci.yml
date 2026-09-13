@@ -116,4 +116,11 @@ jobs:
       - name: Icons
         run: npx tauri icon src-tauri/icons/source.png
 
-      - run: npx tauri build --bundles deb
+      # The release signs the updater manifest with a secret this job cannot
+      # have: it runs on pull_request, where secrets are unavailable to forks
+      # and to Dependabot. The check only has to prove the app compiles and
+      # bundles, so it builds without updater artifacts; release.yml does the
+      # signing with the real key.
+      - run: >
+          npx tauri build --bundles deb
+          --config '{"bundle":{"createUpdaterArtifacts":false}}'
