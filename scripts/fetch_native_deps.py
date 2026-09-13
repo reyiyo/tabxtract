@@ -103,7 +103,7 @@ YTDLP_ASSETS: dict[tuple[str, str], tuple[str, str]] = {
 
 TESSDATA_URL = ("https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/"
                 "87416418657359cb625c412a48b6e1d6d41c29bd/eng.traineddata")
-TESSDATA_SHA256 = "60babc04af8477eaea5877fd0b1e67c1d1b46fa1d1ce8f8a7be384279ace2e54"
+TESSDATA_SHA256 = "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"
 
 BINARY_NAMES = ("ffmpeg", "ffprobe")
 

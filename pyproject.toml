@@ -73,7 +73,10 @@ ignore = [
 ]
 
 [tool.mypy]
-python_version = "3.11"
+# No python_version pin on purpose: each matrix job checks against the
+# interpreter it runs on. Pinning it to 3.11 broke the 3.12 runners, where pip
+# installs numpy >= 2.5, whose stubs use `type X = ...` (PEP 695) - syntax mypy
+# rejects when asked for 3.11 semantics.
 ignore_missing_imports = true
 # The engine is numeric code: demanding full annotations over cv2/numpy is more
 # noise than signal. What is already annotated gets checked.

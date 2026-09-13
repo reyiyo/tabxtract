@@ -12,8 +12,22 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
+    # Packages that share peer dependencies get bumped together or not at all:
+    # a PR raising react without @types/react-dom leaves `npm ci` in ERESOLVE
+    # and CI never even reaches the build.
     groups:
       tauri: { patterns: ["@tauri-apps/*"] }
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      eslint:
+        patterns: ["eslint", "@eslint/*", "typescript-eslint",
+                   "@typescript-eslint/*", "eslint-plugin-*"]
+    # typescript-eslint does not support TypeScript 7 yet: the major bump
+    # leaves `npm ci` in ERESOLVE and no group fixes that. Drop this ignore
+    # once typescript-eslint declares TS 7 support.
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: cargo
     directory: /src-tauri
