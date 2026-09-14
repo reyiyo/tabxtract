@@ -68,9 +68,16 @@ def extract_frames(video_path: Path, out_dir: Path, fps: int = SAMPLE_FPS,
         vf += f",scale=-2:{MAX_HEIGHT}"
 
     pattern = str(out_dir / "frame_%06d.png")
+    # -fps_mode passthrough, not the older -vsync 0: ffmpeg 9 removed -vsync
+    # and rejects the whole argument list, so the bundled build failed before
+    # reading a single frame. The intent is the same - the fps filter already
+    # decides the output rate, and nothing here may duplicate or drop frames.
+    # -fps_mode needs ffmpeg >= 5.0; the bundle ships 9, and the .deb depends
+    # on the distribution's ffmpeg, which is >= 5.1 everywhere the glibc floor
+    # already allows.
     cmd = [
         ffmpeg_bin(), "-y", "-i", str(video_path),
-        "-vf", vf, "-vsync", "0",
+        "-vf", vf, "-fps_mode", "passthrough",
         pattern,
     ]
     if progress is None:

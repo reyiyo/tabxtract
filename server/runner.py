@@ -15,6 +15,7 @@ their own pool because they are waiting on the network, not on CPU.
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -84,13 +85,38 @@ def _emitter(job_id: str):
     return emit
 
 
+# ffmpeg opens every run with its version, its build and one line per library.
+# When the failure is an argument error those banner lines are most of the
+# output, so the tail would be library versions instead of the reason.
+_BANNER = re.compile(r"^(ffmpeg|ffprobe) version |^built with |^configuration: |^lib\w+\s+\d")
+
+
+def _stderr_tail(exc: BaseException, max_lines: int = 4, max_chars: int = 400) -> str:
+    """The last meaningful lines of a failed subprocess's stderr, or "".
+
+    CalledProcessError carries the output the caller captured, but str() drops
+    it: a failing ffmpeg reaches the user as a bare exit code and the reason it
+    printed is thrown away.
+    """
+    raw = getattr(exc, "stderr", None)
+    if not raw:
+        return ""
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", "replace")
+    lines = [line.strip() for line in raw.strip().splitlines() if line.strip()]
+    # Falling back to the unfiltered lines keeps a banner-only stderr visible
+    # rather than reporting nothing at all.
+    lines = [line for line in lines if not _BANNER.match(line)] or lines
+    return " / ".join(lines[-max_lines:])[:max_chars]
+
+
 def _fail(job_id: str, exc: BaseException) -> None:
     if isinstance(exc, Cancelled):
         db.update_job(job_id, status="cancelled", error=None)
         broker.publish(job_id, "cancelled", 1.0, "job cancelled")
         return
     hint = getattr(exc, "hint", "")
-    message = f"{exc} {hint}".strip()
+    message = " ".join(p for p in (str(exc), _stderr_tail(exc), hint) if p).strip()
     # The traceback goes to the log file, which is what a bug report attaches.
     log.error("job %s failed: %s", job_id, message, exc_info=exc)
     db.update_job(job_id, status="failed", error=message)
