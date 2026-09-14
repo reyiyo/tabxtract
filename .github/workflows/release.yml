@@ -179,24 +179,33 @@ jobs:
             echo "$names" | grep -qE -- "$pattern" || { echo "::error::no asset matching $pattern"; fail=1; }
           done
 
+          # Every updater artifact travels with a detached signature, and the
+          # updater refuses a download without it. A .sig that never got
+          # uploaded costs that platform its updates while the release still
+          # looks complete. The .dmg is not listed: the updater does not
+          # consume it, so it is not signed.
+          while read -r asset; do
+            case "$asset" in
+              *.app.tar.gz|*.AppImage|*.deb|*.exe|*.msi)
+                echo "$names" | grep -qxF -- "$asset.sig" \
+                  || { echo "::error::$asset has no .sig next to it"; fail=1; } ;;
+            esac
+          done <<< "$names"
+
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --output latest.json --clobber
           for platform in darwin-aarch64 darwin-x86_64 linux-x86_64 windows-x86_64; do
             jq -e --arg p "$platform" '.platforms[$p].url' latest.json >/dev/null \
               || { echo "::error::latest.json has no entry for $platform"; fail=1; }
           done
 
-          # An entry that exists is not the same as an entry that works: it can
-          # point at an asset that never got uploaded, or carry an empty
-          # signature, and the updater only finds out on a user's machine. The
-          # entries are checked rather than the file names because the updater
-          # artifacts are not named like the installers.
+          # An entry with an empty signature parses fine and fails on a user's
+          # machine. Only the signature is checked, never the asset URL: while
+          # the release is a draft that URL is an api.github.com asset URL
+          # ending in a numeric id, not a file name.
           entries=$(jq -r '.platforms | to_entries[]
-                           | "\(.key)\t\(.value.url)\t\(.value.signature // "")"' latest.json)
-          while IFS=$'\t' read -r platform url sig; do
+                           | "\(.key)\t\(.value.signature // "")"' latest.json)
+          while IFS=$'\t' read -r platform sig; do
             [ -n "$platform" ] || continue
-            asset=${url##*/}
-            echo "$names" | grep -qxF -- "$asset" \
-              || { echo "::error::$platform points at $asset, which is not in the release"; fail=1; }
             [ -n "$sig" ] \
               || { echo "::error::$platform has an empty signature in latest.json"; fail=1; }
           done <<< "$entries"
