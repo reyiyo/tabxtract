@@ -26,6 +26,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python: ["3.11", "3.12"]
+        # The end-to-end tests run on one combination only. The matrix exists
+        # to prove the engine is portable; paying six times for the same E2E
+        # run proves nothing more.
+        include:
+          - os: ubuntu-latest
+            python: "3.12"
+            e2e: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -51,7 +58,7 @@ jobs:
       - name: tesseract on PATH
         run: tesseract --version
 
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[${{ matrix.e2e && 'dev,desktop,e2e' || 'dev' }}]"
 
       - name: Lint
         run: ruff check tabextract server tests scripts
@@ -62,9 +69,15 @@ jobs:
         run: mypy tabextract server
 
       # Includes the identical-pages regression test, which covers silent
-      # page loss (see ARCHITECTURE.md, failure mode 1).
+      # page loss (see ARCHITECTURE.md, failure mode 1). Outside the e2e
+      # combination the end-to-end tests are deselected, not skipped: their
+      # dependencies are not installed there.
       - name: Tests
-        run: pytest -v --cov=tabextract --cov-report=term-missing
+        # Where the e2e tests are selected, a missing dependency fails them
+        # instead of skipping them (tests/e2e/_deps.py).
+        env:
+          TABXTRACT_E2E_REQUIRED: ${{ matrix.e2e && '1' || '' }}
+        run: pytest -v --cov=tabextract --cov-report=term-missing ${{ !matrix.e2e && '-m "not e2e"' || '' }}
 
   frontend:
     name: Frontend

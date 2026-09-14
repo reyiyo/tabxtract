@@ -51,6 +51,12 @@ desktop = [
 build = [
     "pyinstaller>=6",
 ]
+# End-to-end tests against the real sidecar (tests/e2e/). They also need the
+# `desktop` extra; httpx lives here and not there because requirements/sidecar.txt
+# is compiled from `desktop`, and a test client has no place in the frozen bundle.
+e2e = [
+    "httpx>=0.27",
+]
 
 [project.scripts]
 tabextract = "tabextract.cli:main"
@@ -61,6 +67,9 @@ include = ["tabextract*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "e2e: slow end-to-end tests that decode real video and start the sidecar; need ffmpeg, tesseract and the desktop + e2e extras",
+]
 
 [tool.ruff]
 line-length = 110

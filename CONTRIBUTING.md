@@ -110,6 +110,13 @@ The first run builds the image and installs the dependencies into named volumes;
 repository is mounted, so edits on the host are seen immediately. `npm run tauri dev` and
 the `.dmg`/Windows installers still need their own operating system.
 
+The end-to-end tests in `tests/e2e/` (marker `e2e`) encode a synthetic video with ffmpeg,
+start the real sidecar and render PDFs through it and through the CLI. They need ffmpeg,
+tesseract and the `desktop` and `e2e` extras (`pip install -e ".[dev,desktop,e2e]"`), and
+skip when any of that is missing; the container has all of it. They take about a minute;
+`pytest -m "not e2e"` runs only the fast engine tests. Test material is always generated
+from `tests/synthetic.py` at test time — no video or PDF ever enters the repository.
+
 The identical-pages regression test covers Failure mode 1. If it fails, silent page loss
 has been reintroduced.
 
