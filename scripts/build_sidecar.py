@@ -23,10 +23,18 @@ runner.
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import platform
+import queue
 import shutil
 import subprocess
 import sys
+import tempfile
+import threading
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -96,28 +104,115 @@ def main() -> int:
 
 
 def check_frozen(binary: Path) -> int:
-    """Start the binary and wait for the handshake.
+    """Start the binary and wait for the handshake and a healthy API.
 
     PyInstaller happily produces binaries missing a dynamic import that only
     blow up on startup; without this check that failure shows up on the user's
-    machine.
-    """
-    import json
+    machine. The handshake alone is not enough: it is printed before the app
+    module is imported, so a bundle missing FastAPI's dependencies still emits
+    it and then dies.
 
-    proc = subprocess.Popen([str(binary)], stdout=subprocess.PIPE,
-                            stdin=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    ffmpeg is not required on PATH here: the release runners for macOS and
+    Windows do not install it, and the app resolves the bundled copy itself.
+    """
     try:
-        line = proc.stdout.readline().strip() if proc.stdout else ""
-        if not line.startswith("TABXTRACT_READY "):
-            stderr = proc.stderr.read()[:4000] if proc.stderr else ""
-            print(f"error: the frozen binary did not emit the handshake.\n{stderr}",
-                  file=sys.stderr)
-            return 1
-        info = json.loads(line.removeprefix("TABXTRACT_READY "))
-        print(f"handshake ok: port {info['port']}")
-        return 0
-    finally:
-        proc.kill()
+        health = start_and_verify(binary, require_binaries=False)
+    except SidecarCheckError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"handshake and /api/health ok (version {health['version']}, "
+          f"missing binaries: {health['missing_binaries'] or 'none'})")
+    return 0
+
+
+class SidecarCheckError(RuntimeError):
+    pass
+
+
+HANDSHAKE_PREFIX = "TABXTRACT_READY "
+STARTUP_TIMEOUT = 60.0
+
+
+def start_and_verify(binary: Path, require_binaries: bool, timeout: float = STARTUP_TIMEOUT) -> dict:
+    """Start a sidecar binary, wait for its handshake and a healthy /api/health.
+
+    Shared by the build-time check above and by check_installed_bundle.py, so
+    the startup protocol is written once. Returns the health payload; raises
+    SidecarCheckError with the process's stderr on any failure. The process
+    is always stopped before returning.
+    """
+    sys.path.insert(0, str(ROOT))  # `server` lives in the repo, not in site-packages
+    from server.__main__ import HANDSHAKE_PREFIX as SERVER_PREFIX
+    from server.main import TOKEN_HEADER
+
+    assert SERVER_PREFIX == HANDSHAKE_PREFIX
+
+    with tempfile.TemporaryDirectory() as tmp, open(Path(tmp) / "stderr.log", "w+") as stderr:
+        # A throwaway data dir: the check must not write logs or a database
+        # into the runner's home, and must not read a stale one either.
+        env = {**os.environ, "TABXTRACT_DATA_DIR": str(Path(tmp) / "data")}
+        # stdin is a pipe so the sidecar's watchdog stops it if this process
+        # dies; stderr goes to a file so a chatty process never fills a pipe.
+        proc = subprocess.Popen([str(binary)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=stderr, text=True, env=env)
+
+        def failure(message: str) -> SidecarCheckError:
+            stderr.flush()
+            stderr.seek(0)
+            return SidecarCheckError(f"{message}\n--- sidecar stderr (tail) ---\n{stderr.read()[-4000:]}")
+
+        try:
+            lines: queue.Queue[str | None] = queue.Queue()
+
+            def pump() -> None:
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    lines.put(line)
+                lines.put(None)
+
+            threading.Thread(target=pump, daemon=True).start()
+
+            deadline = time.monotonic() + timeout
+            info = None
+            while info is None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise failure(f"no handshake within {timeout:.0f}s")
+                try:
+                    line = lines.get(timeout=remaining)
+                except queue.Empty:
+                    continue
+                if line is None:
+                    raise failure(f"the sidecar exited with {proc.wait()} before the handshake")
+                if line.startswith(HANDSHAKE_PREFIX):
+                    info = json.loads(line[len(HANDSHAKE_PREFIX):])
+
+            request = urllib.request.Request(f"http://127.0.0.1:{info['port']}/api/health",
+                                             headers={TOKEN_HEADER: info["token"]})
+            while True:
+                if proc.poll() is not None:
+                    raise failure(f"the sidecar exited with {proc.returncode} after the handshake")
+                try:
+                    with urllib.request.urlopen(request, timeout=5) as response:
+                        health = json.loads(response.read())
+                    break
+                except (urllib.error.URLError, ConnectionError):
+                    if time.monotonic() > deadline:
+                        raise failure(f"/api/health did not answer within {timeout:.0f}s") from None
+                    time.sleep(0.2)
+
+            if health.get("ok") is not True:
+                raise failure(f"/api/health did not report ok: {health}")
+            if require_binaries and health.get("missing_binaries"):
+                raise failure(f"missing binaries: {health['missing_binaries']}")
+            return health
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
 
 if __name__ == "__main__":

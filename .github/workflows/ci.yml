@@ -143,3 +143,18 @@ jobs:
       - run: >
           npx tauri build --bundles deb
           --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      # What only shows up on the user's machine: the .deb installed for real
+      # (its declared dependencies resolved by apt), then checked from the
+      # installed tree -- declared resources present, executable bits intact,
+      # native binaries starting, and the frozen sidecar answering /api/health.
+      - name: Installed package smoke test
+        run: |
+          shopt -s nullglob
+          debs=(src-tauri/target/release/bundle/deb/*.deb)
+          if [ "${#debs[@]}" -ne 1 ]; then
+            echo "expected exactly one .deb, found ${#debs[@]}: ${debs[*]}"
+            exit 1
+          fi
+          sudo apt-get install -y --no-install-recommends "./${debs[0]}"
+          python scripts/check_installed_bundle.py --deb "${debs[0]}"
