@@ -179,10 +179,36 @@ jobs:
             echo "$names" | grep -qE -- "$pattern" || { echo "::error::no asset matching $pattern"; fail=1; }
           done
 
+          # Every updater artifact travels with a detached signature, and the
+          # updater refuses a download without it. A .sig that never got
+          # uploaded costs that platform its updates while the release still
+          # looks complete. The .dmg is not listed: the updater does not
+          # consume it, so it is not signed.
+          while read -r asset; do
+            case "$asset" in
+              *.app.tar.gz|*.AppImage|*.deb|*.exe|*.msi)
+                echo "$names" | grep -qxF -- "$asset.sig" \
+                  || { echo "::error::$asset has no .sig next to it"; fail=1; } ;;
+            esac
+          done <<< "$names"
+
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --output latest.json --clobber
           for platform in darwin-aarch64 darwin-x86_64 linux-x86_64 windows-x86_64; do
             jq -e --arg p "$platform" '.platforms[$p].url' latest.json >/dev/null \
               || { echo "::error::latest.json has no entry for $platform"; fail=1; }
           done
+
+          # An entry with an empty signature parses fine and fails on a user's
+          # machine. Only the signature is checked, never the asset URL: while
+          # the release is a draft that URL is an api.github.com asset URL
+          # ending in a numeric id, not a file name.
+          entries=$(jq -r '.platforms | to_entries[]
+                           | "\(.key)\t\(.value.signature // "")"' latest.json)
+          while IFS=$'\t' read -r platform sig; do
+            [ -n "$platform" ] || continue
+            [ -n "$sig" ] \
+              || { echo "::error::$platform has an empty signature in latest.json"; fail=1; }
+          done <<< "$entries"
+
           jq '.platforms | keys' latest.json
           exit $fail
