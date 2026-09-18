@@ -53,6 +53,15 @@ jobs:
       - name: System dependencies (Windows)
         if: runner.os == 'Windows'
         run: choco install ffmpeg tesseract -y --no-progress
+      # choco's tesseract package installs into Program Files and leaves PATH
+      # alone, so the steps after it would not find the binary. Fails with a
+      # clear message if the install location ever changes.
+      - name: tesseract into PATH (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $dir = "C:\Program Files\Tesseract-OCR"
+          if (-not (Test-Path "$dir\tesseract.exe")) { throw "tesseract.exe not found in $dir" }
+          $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       # Fails loudly if tesseract is not on PATH, instead of letting the OCR
       # degrade in silence.
       - name: tesseract on PATH
@@ -188,9 +197,15 @@ jobs:
       # instead of against whatever pip resolves for the `engine` job.
       - name: Locked dependencies agree with the engine
         run: pip check
+      # pytest is installed with its own dependencies but constrained to what
+      # is already installed: if it ever needed a different version of a
+      # package that ships, pip fails here instead of quietly changing the
+      # environment under test. (Listing its dependencies by hand broke as
+      # soon as pytest added one.)
       - name: Engine tests against the locked versions
         run: |
-          pip install --no-deps pytest pluggy iniconfig
+          pip freeze --exclude-editable > "$RUNNER_TEMP/locked.txt"
+          pip install pytest -c "$RUNNER_TEMP/locked.txt"
           pytest -q -m "not e2e"
 
       # Freezes the backend and verifies it by starting it: PyInstaller
