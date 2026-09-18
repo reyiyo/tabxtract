@@ -18,6 +18,10 @@ export default defineConfig({
     // Component tests render into a DOM; the pure tests do not mind it.
     environment: "jsdom",
     setupFiles: ["src/__tests__/setup.ts"],
-    exclude: ["**/node_modules/**", "**/dist/**"],
+    // The app's tests live in src/. Anchoring the pattern to the project root
+    // keeps sibling checkouts of this repository -- git worktrees created
+    // inside the tree -- from being collected, which otherwise makes the
+    // result depend on what happens to be checked out beside it.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });

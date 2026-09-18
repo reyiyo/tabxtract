@@ -5,8 +5,10 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
+  // Worktrees are checkouts of this repository inside the tree: linting them
+  // lints another branch's code.
   { ignores: ["dist", "src-tauri/target", "node_modules", "docs",
-              "playwright-report", "test-results"] },
+              "playwright-report", "test-results", "**/worktrees/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

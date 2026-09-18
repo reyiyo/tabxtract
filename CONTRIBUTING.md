@@ -111,11 +111,23 @@ repository is mounted, so edits on the host are seen immediately. `npm run tauri
 the `.dmg`/Windows installers still need their own operating system.
 
 The end-to-end tests in `tests/e2e/` (marker `e2e`) encode a synthetic video with ffmpeg,
-start the real sidecar and render PDFs through it and through the CLI. They need ffmpeg,
-tesseract and the `desktop` and `e2e` extras (`pip install -e ".[dev,desktop,e2e]"`), and
-skip when any of that is missing; the container has all of it. They take about a minute;
+start the real sidecar and render PDFs through it and through the CLI. They need ffmpeg and
+the `desktop` and `e2e` extras (`pip install -e ".[dev,desktop,e2e]"`), and skip when either
+is missing; the container has both. Tesseract is optional: without it the bar-number check
+reports as unavailable, which these tests do not assert on. They take about a minute;
 `pytest -m "not e2e"` runs only the fast engine tests. Test material is always generated
 from `tests/synthetic.py` at test time — no video or PDF ever enters the repository.
+
+The browser test in `e2e/` drives the built frontend against a real sidecar with Playwright:
+
+```bash
+npx playwright install chromium     # once
+npm run test:e2e
+```
+
+Its setup starts the sidecar (so the `desktop` extra and ffmpeg are needed), builds the app
+into a temporary directory pointed at that sidecar, and serves it with `vite preview`. This
+one does **not** run in the development container: the image has no browser.
 
 The identical-pages regression test covers Failure mode 1. If it fails, silent page loss
 has been reintroduced.

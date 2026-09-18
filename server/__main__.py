@@ -150,8 +150,12 @@ def main() -> None:
 
     # log_config=None: uvicorn's loggers propagate to the root configured above
     # instead of installing their own handlers.
+    # timeout_graceful_shutdown: a request or socket that will not finish must
+    # not keep the process alive. Tauri terminates the sidecar on window close
+    # and then waits for it; without a bound, a stuck task turns that into a
+    # window that closes and a process that stays.
     config = uvicorn.Config(create_app(token), log_level="info", access_log=False,
-                            log_config=None)
+                            log_config=None, timeout_graceful_shutdown=3)
     uvicorn.Server(config).run(sockets=[sock])
 
 

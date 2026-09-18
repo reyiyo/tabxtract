@@ -48,7 +48,10 @@ if [ ! -x /cache/venv/bin/python ]; then
 fi
 if [ "$(cat "$STAMP" 2>/dev/null)" != "$WANT" ]; then
   echo ">> installing Python dependencies (pyproject.toml changed)"
-  pip install -q -e ".[dev,desktop,build,e2e]" && echo "$WANT" > "$STAMP"
+  # Without the exit, a failed install would run the requested command against
+  # a half-built environment and the error would be attributed to the command.
+  pip install -q -e ".[dev,desktop,build,e2e]" || exit 1
+  echo "$WANT" > "$STAMP"
 fi
 if [ ! -f node_modules/.package-lock.json ]; then
   echo ">> installing node modules (first run only)"

@@ -31,8 +31,10 @@ def test_video_to_pdf_through_the_sidecar(sidecar, synthetic_video: Path, tmp_pa
 
         # Creating the job already queues its analysis, and the progress
         # broker keeps no backlog: whatever is published before a socket
-        # subscribes is gone. So the socket opens first, and the run whose
-        # progress is asserted is the explicit analyze triggered after it.
+        # subscribes is gone. Opening the socket before triggering another run
+        # guarantees a complete stream is seen -- it may belong to either run,
+        # which is why the assertions below are about the shape of the
+        # progress, not about which run produced it.
         with connect(sidecar.progress_url(job_id), open_timeout=10) as ws:
             assert http.post(f"/api/jobs/{job_id}/analyze").status_code == 200
             sidecar.wait_for_idle_worker(http, synthetic_video)

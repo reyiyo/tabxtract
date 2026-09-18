@@ -37,6 +37,8 @@ class Sidecar:
     token_header: str
     data_dir: Path
     stderr_path: Path
+    # The process itself, for the tests that are about how it stops.
+    proc: subprocess.Popen
 
     @property
     def base_url(self) -> str:
@@ -185,7 +187,7 @@ def running_sidecar(root: Path) -> Iterator[Sidecar]:
         info = _read_handshake(proc, HANDSHAKE_PREFIX, stderr_path)
         assert info["token"] == token, "the handshake must echo the token it was given"
         sidecar = Sidecar(port=info["port"], token=info["token"], token_header=TOKEN_HEADER,
-                          data_dir=data_dir, stderr_path=stderr_path)
+                          data_dir=data_dir, stderr_path=stderr_path, proc=proc)
         _wait_healthy(sidecar, proc)
         yield sidecar
     finally:

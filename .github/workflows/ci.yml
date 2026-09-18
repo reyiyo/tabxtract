@@ -111,8 +111,11 @@ jobs:
           cache: npm
 
       # The synthetic video is encoded at test time; nothing is committed.
-      - name: ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # tesseract is installed for the same reason the .deb depends on it: so
+      # the browser drives the app the user's machine runs, with the
+      # bar-number check available rather than reported as missing.
+      - name: System dependencies
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr
 
       # The sidecar the browser talks to is the real one, started by the
       # Playwright global setup.
@@ -176,6 +179,19 @@ jobs:
       - run: |
           pip install --require-hashes -r requirements/sidecar.txt
           pip install --no-deps -e .
+
+      # The lock is what reaches the user, and `--no-deps` above hides any
+      # conflict with pyproject.toml. This is what a dependency bump needs to
+      # pass: `pip check` sees the conflict (it would have named
+      # opencv-python-headless 5.0.0.93 against the declared <5), and the
+      # engine tests then run against the exact versions that get frozen,
+      # instead of against whatever pip resolves for the `engine` job.
+      - name: Locked dependencies agree with the engine
+        run: pip check
+      - name: Engine tests against the locked versions
+        run: |
+          pip install --no-deps pytest pluggy iniconfig
+          pytest -q -m "not e2e"
 
       # Freezes the backend and verifies it by starting it: PyInstaller
       # happily delivers bundles missing a dynamic import.

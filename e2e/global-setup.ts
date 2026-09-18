@@ -19,10 +19,12 @@ import { writeState } from "./state";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PYTHON = process.env.TABXTRACT_PYTHON ?? "python3";
-// server/main.py, TOKEN_HEADER. Not importable from here: it is Python.
-const TOKEN_HEADER = "x-tabxtract-token";
+// Vite is started directly rather than through npx: killing npx leaves the
+// real process running, and this setup has to be able to stop it.
+const VITE = join(ROOT, "node_modules", ".bin", "vite");
 const HANDSHAKE_PREFIX = "TABXTRACT_READY ";
 const STARTUP_TIMEOUT = 120_000;
+const SHUTDOWN_GRACE = 5_000;
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -65,13 +67,35 @@ async function waitUntil(what: string, probe: () => Promise<boolean>): Promise<v
   throw new Error(`${what} did not come up within ${STARTUP_TIMEOUT} ms. ${lastError}`);
 }
 
-/** Start `python -m server` and wait for its handshake line and /api/health. */
-async function startSidecar(port: number, token: string, dataDir: string, tempDir: string) {
-  const child = spawn(PYTHON, ["-m", "server", "--port", String(port), "--token", token], {
-    cwd: ROOT,
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, TABXTRACT_DATA_DIR: dataDir, TMPDIR: tempDir },
+/** SIGTERM, then SIGKILL if it is still alive: teardown must be certain. */
+function stop(child: ChildProcess | undefined): Promise<void> {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolve) => {
+    const force = setTimeout(() => child.kill("SIGKILL"), SHUTDOWN_GRACE);
+    child.once("exit", () => {
+      clearTimeout(force);
+      resolve();
+    });
+    child.kill("SIGTERM");
   });
+}
+
+/** Start `python -m server` and wait for its handshake line and /api/health. */
+async function startSidecar(
+  port: number, token: string, tokenHeader: string, dataDir: string, tempDir: string,
+) {
+  const child = spawn(
+    PYTHON,
+    // --parent-pid is the sidecar's own watchdog, the one Tauri uses: if this
+    // process dies, the sidecar notices and exits. Its other watchdog, the one
+    // on stdin, only arms for a FIFO, and Node's stdio pipes are socketpairs.
+    ["-m", "server", "--port", String(port), "--token", token, "--parent-pid", String(process.pid)],
+    {
+      cwd: ROOT,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, TABXTRACT_DATA_DIR: dataDir, TMPDIR: tempDir },
+    },
+  );
   let stderr = "";
   let handshake = "";
   child.stderr.on("data", (chunk) => (stderr += chunk));
@@ -83,16 +107,11 @@ async function startSidecar(port: number, token: string, dataDir: string, tempDi
     }
     if (!handshake.includes(HANDSHAKE_PREFIX)) return false;
     const response = await fetch(`http://127.0.0.1:${port}/api/health`, {
-      headers: { [TOKEN_HEADER]: token },
+      headers: { [tokenHeader]: token },
     });
     return response.ok;
   });
   return child;
-}
-
-function stop(child: ChildProcess | undefined): void {
-  if (!child || child.exitCode !== null) return;
-  child.kill("SIGTERM");
 }
 
 export default async function globalSetup(): Promise<() => Promise<void>> {
@@ -103,24 +122,29 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   let preview: ChildProcess | undefined;
 
   const teardown = async () => {
-    stop(preview);
-    stop(sidecar);
+    await stop(preview);
+    await stop(sidecar);
     rmSync(root, { recursive: true, force: true });
   };
 
   try {
+    // The header name comes from the server, like everywhere else.
+    const tokenHeader = (
+      await run(PYTHON, ["-c", "from server.main import TOKEN_HEADER; print(TOKEN_HEADER)"])
+    ).trim();
+
     const video = JSON.parse(
       await run(PYTHON, ["-m", "tests.synthetic_video", join(root, "paged.mkv")]),
     ) as { path: string; width: number; height: number };
 
     const backendPort = await freePort();
     const token = `e2e-${Math.random().toString(36).slice(2)}`;
-    sidecar = await startSidecar(backendPort, token, join(root, "data"), join(root, "tmp"));
+    sidecar = await startSidecar(backendPort, token, tokenHeader, join(root, "data"), join(root, "tmp"));
 
     const api = async (path: string, init: RequestInit = {}) => {
       const response = await fetch(`http://127.0.0.1:${backendPort}${path}`, {
         ...init,
-        headers: { [TOKEN_HEADER]: token, "content-type": "application/json" },
+        headers: { [tokenHeader]: token, "content-type": "application/json" },
       });
       if (!response.ok) throw new Error(`${path} answered ${response.status}: ${await response.text()}`);
       return response.json();
@@ -134,7 +158,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       body: JSON.stringify({ path: video.path }),
     })) as { id: string; title: string };
 
-    await run("npx", ["vite", "build", "--outDir", distDir, "--emptyOutDir"], {
+    await run(VITE, ["build", "--outDir", distDir, "--emptyOutDir"], {
       VITE_BACKEND_PORT: String(backendPort),
       VITE_BACKEND_TOKEN: token,
     });
@@ -142,17 +166,17 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     const previewPort = await freePort();
     const baseUrl = `http://127.0.0.1:${previewPort}`;
     preview = spawn(
-      "npx",
-      ["vite", "preview", "--outDir", distDir, "--host", "127.0.0.1",
+      VITE,
+      ["preview", "--outDir", distDir, "--host", "127.0.0.1",
        "--port", String(previewPort), "--strictPort"],
       { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] },
     );
     await waitUntil("vite preview", async () => (await fetch(baseUrl)).ok);
 
-    writeState({
+    writeState(join(root, "state.json"), {
       baseUrl,
       backend: { port: backendPort, token },
-      tokenHeader: TOKEN_HEADER,
+      tokenHeader,
       video: { path: video.path, width: video.width, height: video.height },
       jobId: job.id,
       jobTitle: job.title,
