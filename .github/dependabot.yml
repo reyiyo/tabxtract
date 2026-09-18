@@ -38,3 +38,11 @@ updates:
   - package-ecosystem: pip
     directory: /requirements
     schedule: { interval: weekly }
+    # opencv 5 breaks the engine: under 5.0.0.93 compute_scroll_offsets
+    # accumulates the wrong scroll distance (the stepwise-scroll regression
+    # test measures 2520px for a real 990px) and scroll-mode renders fail.
+    # pyproject.toml pins <5 for that reason. Drop this ignore only after the
+    # engine tests pass on the new major.
+    ignore:
+      - dependency-name: opencv-python-headless
+        update-types: ["version-update:semver-major"]

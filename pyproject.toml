@@ -15,6 +15,10 @@ classifiers = [
     "Topic :: Multimedia :: Video",
 ]
 dependencies = [
+    # <5 is load-bearing, not caution: under opencv 5.0.0.93 the stepwise-scroll
+    # regression test measures 2520px of scroll for a real 990px, and scroll-mode
+    # renders fail. requirements/sidecar.txt and .github/dependabot.yml follow
+    # this pin; lift it only once the engine tests pass on the new major.
     "opencv-python-headless>=4.9,<5",
     "numpy>=1.26,<3",
     "Pillow>=10.2",
@@ -47,6 +51,12 @@ desktop = [
 build = [
     "pyinstaller>=6",
 ]
+# End-to-end tests against the real sidecar (tests/e2e/). They also need the
+# `desktop` extra; httpx lives here and not there because requirements/sidecar.txt
+# is compiled from `desktop`, and a test client has no place in the frozen bundle.
+e2e = [
+    "httpx>=0.27",
+]
 
 [project.scripts]
 tabextract = "tabextract.cli:main"
@@ -57,6 +67,9 @@ include = ["tabextract*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "e2e: slow end-to-end tests that decode real video and start the sidecar; need ffmpeg, tesseract and the desktop + e2e extras",
+]
 
 [tool.ruff]
 line-length = 110

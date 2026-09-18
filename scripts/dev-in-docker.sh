@@ -35,12 +35,23 @@ if [ -t 0 ]; then
   TTY=(-it)
 fi
 
-# Bootstrap once per volume: the venv from pyproject.toml, node_modules from
-# the lock. Both are skipped when they already exist.
+# Bootstrap per volume: the venv from pyproject.toml, node_modules from the
+# lock. The Python dependencies are reinstalled whenever pyproject.toml
+# changes (a hash stamp in the venv), so a volume created before a new extra
+# or dependency does not silently run without it.
 BOOTSTRAP='
+STAMP=/cache/venv/.pyproject.sha256
+WANT="$(sha256sum pyproject.toml | cut -d" " -f1)"
 if [ ! -x /cache/venv/bin/python ]; then
   echo ">> creating the Python environment (first run only)"
-  python -m venv /cache/venv && pip install -q -e ".[dev,desktop,build]"
+  python -m venv /cache/venv
+fi
+if [ "$(cat "$STAMP" 2>/dev/null)" != "$WANT" ]; then
+  echo ">> installing Python dependencies (pyproject.toml changed)"
+  # Without the exit, a failed install would run the requested command against
+  # a half-built environment and the error would be attributed to the command.
+  pip install -q -e ".[dev,desktop,build,e2e]" || exit 1
+  echo "$WANT" > "$STAMP"
 fi
 if [ ! -f node_modules/.package-lock.json ]; then
   echo ">> installing node modules (first run only)"
