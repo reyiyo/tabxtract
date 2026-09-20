@@ -27,6 +27,10 @@ tsconfig.tsbuildinfo
 build/
 dist-artifacts/
 
+# Browser end-to-end runs (Playwright)
+playwright-report/
+test-results/
+
 # Local state, logs, secrets and personal notes
 data/
 *.local*

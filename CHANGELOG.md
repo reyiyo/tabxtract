@@ -6,6 +6,14 @@ Every published version and what changed in it. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The job-progress WebSocket now notices that the client disconnected. It used to wait only
+  on the next progress message, so closing a progress screen left the task and its
+  subscription alive until the job published again — and forever for a job that did not.
+  Those accumulated over a session, and uvicorn's graceful shutdown waited for them, which
+  could turn closing the window into a sidecar that stayed. The shutdown is bounded too.
+
 ## [0.1.0] - first public release
 
 ### Added

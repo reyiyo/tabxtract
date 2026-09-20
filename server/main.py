@@ -14,6 +14,7 @@ send jobs to this process.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import importlib.metadata
 import json
 import secrets
@@ -255,14 +256,39 @@ def _register_routes(app: FastAPI) -> None:  # noqa: C901 - it is a flat router
 
     @app.websocket("/api/jobs/{job_id}/progress")
     async def progress_ws(websocket: WebSocket, job_id: JobId):
+        """Job progress, until the job stops publishing or the client leaves.
+
+        The disconnection only arrives through `receive()`, so the socket is
+        watched alongside the queue. Waiting on the queue alone, this task
+        survives the client: it ends when the next message fails to send, and
+        for a job that never publishes again, never. Those tasks and their
+        subscriptions pile up per progress screen, and uvicorn's graceful
+        shutdown waits for them.
+        """
         await websocket.accept()
+
+        async def until_disconnected() -> None:
+            while True:
+                if (await websocket.receive())["type"] == "websocket.disconnect":
+                    return
+
         with broker.subscribe(job_id) as queue:
+            disconnected = asyncio.create_task(until_disconnected())
             try:
                 while True:
-                    payload = await queue.get()
-                    await websocket.send_text(json.dumps(payload))
+                    message = asyncio.create_task(queue.get())
+                    done, _pending = await asyncio.wait(
+                        (message, disconnected), return_when=asyncio.FIRST_COMPLETED)
+                    if disconnected in done:
+                        message.cancel()
+                        break
+                    await websocket.send_text(json.dumps(message.result()))
             except (WebSocketDisconnect, RuntimeError):
                 pass
+            finally:
+                disconnected.cancel()
+                with contextlib.suppress(asyncio.CancelledError, RuntimeError, WebSocketDisconnect):
+                    await disconnected
 
     # -------------------------------------------------------------- YouTube
 
